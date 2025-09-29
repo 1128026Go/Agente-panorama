@@ -1,0 +1,206 @@
+{
+  "name": "LAIA Main Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "laia-orchestrator",
+        "responseMode": "responseNode"
+      },
+      "id": "node-1",
+      "name": "Main Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract canonical fields and preserve session_id + metadata\nconst { intent, payload, session_id, user_message, meta } = items[0].json || {};\nconst out = { intent, payload, session_id, user_message, meta };\nreturn [{ json: out }];"
+      },
+      "id": "node-2",
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [400, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Validate input and split outputs: 1 = valid, 2 = invalid (for error reply)\nconst data = items[0].json || {};\nconst errors = [];\nif (!data.intent) errors.push('missing intent');\nif (!data.session_id) data.session_id = `session_${Date.now()}`; // ensure session_id exists\n// payload may be required depending on intent; for quote and payment we expect payload\nif ((data.intent === 'quote.create' || data.intent === 'payment.create_link' || data.intent === 'payment.link') && !data.payload) errors.push('missing payload for intent ' + data.intent);\nif (errors.length === 0) {\n  return [items, []];\n} else {\n  const err = { json: { ok: false, status: 400, error: errors.join('; '), session_id: data.session_id, timestamp: new Date().toISOString() } };\n  return [[], [err]];\n}"
+      },
+      "id": "node-2b",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [520, 200]
+    },
+    {
+      "parameters": {
+        "rules": [
+          { "value1": "={{ $json.intent }}", "operation": "equal", "value2": "quote.create" },
+          { "value1": "={{ $json.intent }}", "operation": "equal", "value2": "payment.create_link" },
+          { "value1": "={{ $json.intent }}", "operation": "equal", "value2": "payment.link" },
+          { "value1": "={{ $json.intent }}", "operation": "equal", "value2": "calendar.schedule" },
+          { "value1": "={{ $json.intent }}", "operation": "equal", "value2": "calc.run" },
+          { "value1": "={{ $json.intent }}", "operation": "equal", "value2": "info.services" }
+        ],
+        "combineOperation": "OR"
+      },
+      "id": "node-3",
+      "name": "Intent Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/api/laia/quotes/create",
+        "options": {
+          "method": "POST",
+          "timeout": 30000,
+          "retry": 2
+        },
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ JSON.stringify($json.payload) }}",
+        "headerParametersJson": "={\"X-Internal-Token\": \"={{ $vars.LAIA_N8N_TOKEN || $env.LAIA_N8N_TOKEN || 'laia-local-token' }}\",\"Content-Type\":\"application/json\",\"Accept\":\"application/json\",\"Access-Control-Allow-Origin\":\"*\",\"Access-Control-Allow-Headers\":\"Content-Type, Authorization\"}"
+      },
+      "id": "node-4",
+      "name": "Create Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 100]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/api/laia/payments/create-link",
+        "options": {
+          "method": "POST",
+          "timeout": 30000,
+          "retry": 2
+        },
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ JSON.stringify($json.payload) }}",
+        "headerParametersJson": "={\"X-Internal-Token\": \"={{ $vars.LAIA_N8N_TOKEN || $env.LAIA_N8N_TOKEN || 'laia-local-token' }}\",\"Content-Type\":\"application/json\",\"Accept\":\"application/json\",\"Access-Control-Allow-Origin\":\"*\",\"Access-Control-Allow-Headers\":\"Content-Type, Authorization\"}"
+      },
+      "id": "node-5",
+      "name": "Payment Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/api/laia/calendar/schedule",
+        "options": {
+          "method": "POST",
+          "timeout": 30000,
+          "retry": 2
+        },
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ JSON.stringify($json.payload) }}",
+        "headerParametersJson": "={\"X-Internal-Token\": \"={{ $vars.LAIA_N8N_TOKEN || $env.LAIA_N8N_TOKEN || 'laia-local-token' }}\",\"Content-Type\":\"application/json\",\"Accept\":\"application/json\",\"Access-Control-Allow-Origin\":\"*\",\"Access-Control-Allow-Headers\":\"Content-Type, Authorization\"}"
+      },
+      "id": "node-6",
+      "name": "Schedule Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/api/laia/calc/run",
+        "options": {
+          "method": "POST",
+          "timeout": 30000,
+          "retry": 2
+        },
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ JSON.stringify($json.payload) }}",
+        "headerParametersJson": "={\"X-Internal-Token\": \"={{ $vars.LAIA_N8N_TOKEN || $env.LAIA_N8N_TOKEN || 'laia-local-token' }}\",\"Content-Type\":\"application/json\",\"Accept\":\"application/json\",\"Access-Control-Allow-Origin\":\"*\",\"Access-Control-Allow-Headers\":\"Content-Type, Authorization\"}"
+      },
+      "id": "node-7",
+      "name": "Run Calculation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Enhanced service information with prices, contact and suggestions\nreturn [{ json: {\n  ok: true,\n  intent: 'info.services',\n  services: [\n    { id: 'PMT', name: 'Plan de Manejo de Tránsito', approx_price_cop: 1500000, notes: 'Precio orientativo. Depende del alcance y número de intersecciones.' },\n    { id: 'Aforo', name: 'Aforo vehicular y peatonal', approx_price_cop: 800000, notes: 'Incluye muestreo horario y reporte.' },\n    { id: 'Inspeccion', name: 'Inspección de obra', approx_price_cop: 600000, notes: 'Visita técnica en sitio, hasta 4 horas.' }\n  ],\n  contact: { name: 'Soporte LAIA', email: 'soporte@laia.local', phone: '+57 300 000 0000', hours: 'Lun-Vie 8:00-18:00' },\n  suggestions: [ 'Solicitar cotización para PMT', 'Solicitar cálculo de aforo', 'Agendar visita técnica' ],\n  session_id: $json.session_id || null,\n  timestamp: new Date().toISOString()\n} }];"
+      },
+      "id": "node-8",
+      "name": "Info Services",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize output from HTTP nodes and functions into a consistent envelope\nconst data = items[0].json || {};\nconst envelope = {\n  ok: data.ok !== undefined ? data.ok : true,\n  status: data.status || (data.statusCode || 200),\n  session_id: data.session_id || data.sessionId || $json.session_id || null,\n  timestamp: new Date().toISOString(),\n  intent: data.intent || $json.intent || null,\n  source: data.source || 'n8n',\n  data: data.data || data.body || (data.result || data)\n};\nreturn [{ json: envelope }];"
+      },
+      "id": "node-9",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "options": { "responseCode": 200 }
+      },
+      "id": "node-10",
+      "name": "Send Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "responseMode": "lastNode",
+        "options": { "responseCode": 400 }
+      },
+      "id": "node-11",
+      "name": "Error Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 150]
+    }
+  ],
+  "connections": {
+    "Main Webhook": {
+      "main": [
+        [
+          { "node": "Extract Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract Data": {
+      "main": [
+        [
+          { "node": "Validate Input", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [ { "node": "Intent Router", "type": "main", "index": 0 } ],
+        [ { "node": "Error Respond", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Intent Router": {
+      "main": [
+        [ { "node": "Create Quote", "type": "main", "index": 0 } ],
+        [ { "node": "Payment Link", "type": "main", "index": 0 } ],
+        [ { "node": "Schedule Calendar", "type": "main", "index": 0 } ],
+        [ { "node": "Run Calculation", "type": "main", "index": 0 } ],
+        [ { "node": "Info Services", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Create Quote": { "main": [ [ { "node": "Format Response", "type": "main", "index": 0 } ] ] },
+    "Payment Link": { "main": [ [ { "node": "Format Response", "type": "main", "index": 0 } ] ] },
+    "Schedule Calendar": { "main": [ [ { "node": "Format Response", "type": "main", "index": 0 } ] ] },
+    "Run Calculation": { "main": [ [ { "node": "Format Response", "type": "main", "index": 0 } ] ] },
+    "Info Services": { "main": [ [ { "node": "Format Response", "type": "main", "index": 0 } ] ] },
+    "Format Response": { "main": [ [ { "node": "Send Response", "type": "main", "index": 0 } ] ] }
+  }
+}

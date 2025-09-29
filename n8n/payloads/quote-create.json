@@ -1,0 +1,11 @@
+{
+  "intent": "quote.create",
+  "user_id": 1,
+  "message": "create quote test",
+  "data": {
+    "client": { "name": "Cliente Demo" },
+    "items": [
+      { "name": "Servicio A", "qty": 1, "price": 1000 }
+    ]
+  }
+}

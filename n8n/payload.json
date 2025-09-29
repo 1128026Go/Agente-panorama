@@ -1,0 +1,12 @@
+{
+  "proyecto": "Aforo Calle 80",
+  "nit": "900123456",
+  "email_cliente": "cliente@acme.com",
+  "direccion_obra": "Cl 80 #20-30 Bogota",
+  "tipo_obra": "PMT",
+  "localidad": "Engativa",
+  "fecha_aforo_deseada": "2025-10-01T09:00:00-05:00",
+  "nombre_empresa": "ACME SAS",
+  "celular_cliente": "+57 3001234567",
+  "tipo_servicio": "PMT"
+}
