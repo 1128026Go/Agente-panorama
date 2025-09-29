@@ -2,10 +2,16 @@
     "name": "laia/agent-panorama",
     "description": "Proyecto base para el chatbot LAIA",
     "type": "project",
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
     "require": {
-        "php": "^8.1",
+        "php": "^8.2",
         "laravel/framework": "^11.0",
-        "google/gemini-php": "^1.0",
+        "google-gemini-php/client": "^2.6",
+        "guzzlehttp/guzzle": "^7.8",
         "barryvdh/laravel-dompdf": "^2.0",
         "maatwebsite/excel": "^3.1"
     },
@@ -16,11 +22,10 @@
     },
     "scripts": {
         "post-autoload-dump": [
-            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
+            "php -r \"if (file_exists('artisan')) { passthru('php artisan package:discover --ansi'); }\""
         ],
         "post-update-cmd": [
-            "@php artisan migrate --seed"
+            "php -r \"if (file_exists('artisan')) { passthru('php artisan migrate --seed'); }\""
         ]
     }
 }
